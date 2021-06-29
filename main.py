@@ -1,25 +1,21 @@
-from typing import Optional #引入可选类型，Optional[X] 相当于 Union[X, None]
+from typing import Optional
+from pydantic import BaseModel
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Path
 
 app = FastAPI()
 
-# 定义临时数据
-fake_items_db = [
-    {"item_name": 'Foo'},
-    {"item_name": 'Bar'},
-    {"item_name": 'Baz'},
-]
+'''
+路径参数及校验 Path
+'''
 
-# # 请求路径：http://127.0.0.1:8000/items/?skip=2&limit=2
-# @app.get('/items/')
-# # 定义参数skip int类型,默认值0,limit:int类型，默认值10
-# async def read_item(skip: int = 0, limit: int = 10):
-#     return fake_items_db[skip:skip+limit]  # 数据切片
-
-
+#路径参数总是必需的，因为它必须是路径的一部分。所以，你应该在声明时使用 ... 将其标记为必需参数。
 @app.get('/items/{item_id}')
-async def read_item(item_id: str, q: Optional[str] = None): # item_id 是路径参数，q 是查询参数
+async def read_items(
+    item_id: int = Path(..., title="标题"),
+    q: Optional[str] = Query(None, alias="item-query"),
+):
+    results = {"item_id": item_id}
     if q:
-        return {'item_id': item_id, "q": q}
-    return {"item_id": item_id}
+        results.update({"q": q})
+    return results

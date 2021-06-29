@@ -269,3 +269,5 @@ async def read_item(q: Optional[str] = Query(None, title="查询字符串", desc
     return result
 ```
 
+### 路径参数和数值校验
+>1.
