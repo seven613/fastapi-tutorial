@@ -1,27 +1,25 @@
+from typing import Optional #引入可选类型，Optional[X] 相当于 Union[X, None]
+
 from fastapi import FastAPI
 
-app  = FastAPI()
+app = FastAPI()
 
-@app.get('/')
-async  def root():
-  return {"message":"Hello FastAPI"}
+# 定义临时数据
+fake_items_db = [
+    {"item_name": 'Foo'},
+    {"item_name": 'Bar'},
+    {"item_name": 'Baz'},
+]
 
-#命令行运行：uvicorn main:app --reload
-# uvicorn main:app 命令含义如下:
-# main：main.py 文件（一个 Python「模块」）。
-# app：在 main.py 文件中通过 app = FastAPI() 创建的对象。
-# --reload：让服务器在更新代码后重新启动。仅在开发时使用该选项。
-
-
-
-
-
+# # 请求路径：http://127.0.0.1:8000/items/?skip=2&limit=2
+# @app.get('/items/')
+# # 定义参数skip int类型,默认值0,limit:int类型，默认值10
+# async def read_item(skip: int = 0, limit: int = 10):
+#     return fake_items_db[skip:skip+limit]  # 数据切片
 
 
-# uvicorn main:my_awesome_api --reload
-# my_awesome_api = FastAPI()
-
-# @my_awesome_api.get('/')
-# async def root():
-#   return{"message":"Hello FastAPI my_awesome_api"}
-
+@app.get('/items/{item_id}')
+async def read_item(item_id: str, q: Optional[str] = None): # item_id 是路径参数，q 是查询参数
+    if q:
+        return {'item_id': item_id, "q": q}
+    return {"item_id": item_id}
