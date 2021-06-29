@@ -2,8 +2,7 @@
 
 ### 安装
 ```
-pip install fastapi 
-pip install uvicorn #运行服务器
+pip install -r requirements.txt
 ```
 ### 起步
 > 1.创建一个FastAPI程序
@@ -157,3 +156,116 @@ async def read_item(item_id: str, q: Optional[str] = None): # item_id 是路径�
 
 ```
 >4.查询参数类型转换
+```
+'''请求路径:http://127.0.0.1:8000/items/foo?short=1
+其中：short =1,short = True ,short=true,short=on,short =yes 都可以，均被转换为bool类型
+''' 
+@app.get('/items/{item_id}')
+async def read_item(item_id: str, q: Optional[str] = None, short: bool = False): #布尔型，路径中传入的正值均被转为True
+    item = {'item_id': item_id}
+    if q:
+        item.update({'q': q})
+    if not short:
+        item.update({'description': '描述信息'})
+    return item
+```
+>5.多路径中的查询参数
+```
+
+'''
+多路径中的查询参数应用，必须在路径操作函数中定义相同名称即可识别
+'''
+@app.get('/users/{user_id}/items/{item_id}')
+async def read_user_item(user_id: int, item_id: str, q: Optional[str] = None, short: bool = False):
+    item = {'item_id': item_id, 'owner_id': user_id}
+    if q:
+        item.update({'q': q})
+    if not short:
+        item.update({'description': '描述'})
+    return item
+```
+
+>6.非路径查询参数，必传、默认值、不传
+```
+'''
+非路径查询参数，必须查询参数.needy必须传入值;skip 可以不传默认为0;limit可以不传，没有默认值
+'''
+@app.get('/items/{item_id}')
+async def read_user_item(item_id: str,needy:str,skip:int =0,limit:Optional[int]=None):
+    item={'item_id':item_id,'needy':needy,'skip':skip,'limit':limit}
+    return item
+```
+### 请求体
+>1.定义 请求体：客户端发给API的数据；响应体：API发送给客户端的数据
+    不能用GET 发送请求体，发送数据常见方法：POST
+>2.基本示例
+```
+
+# 声明数据模型
+
+
+class Item(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    tax: Optional[float] = None
+
+
+app = FastAPI()
+
+
+@app.post('/items/')
+async def create_item(item: Item):  # item为Item模型的数据，必须全部匹配。如果不匹配，则报错
+    print(item.name)  # 支持编辑器代码提示和补全
+    #函数体内部可以访问传入的模型对象数据的所有属性
+    item_dict = item.dict()
+    if item.tax:
+        price_with_tax = item.price+item.tax
+        item_dict.update({'price_with_tax': price_with_tax})
+    return item_dict
+```
+>3.请求体中的路径参数、查询参数
+```
+
+'''
+请求体中的路径参数、查询参数
+'''
+
+
+@app.post('/items/{item_id}')
+async def create_item(item_id: int, item: Item, q: Optional[str] = None):
+    # **item.dict()解包，将字典中的k,v 全部输出
+    result = {'item_id': item_id, **item.dict()}
+    if q:
+        result.update({'q': q})
+    return result
+
+```
+### 查询参数和字符串校验
+>1.基本示例 字符串长度校验
+```
+from typing import Optional
+from pydantic import BaseModel
+
+from fastapi import FastAPI, Query
+
+app = FastAPI()
+
+'''
+参数校验，使用Query
+'''
+@app.get('/items/')
+# 字符串不为空时，最短3个字符，最长18个字符。regex使用正则表达式
+# title 标题名，description：描述, alias 别名，deprecated 弃用函数
+async def read_item(q: Optional[str] = Query(None, title="查询字符串", description='描述', alias='itemp-query',deprecated=True,min_lenght=3, max_length=50, regex='^fixedquery$')):
+#async def read_item(q: Optional[str] = Query(None, min_lenght=3, max_length=50,regex='^fixedquery$')):#字符串不为空时，最短3个字符，最长18个字符。regex 为正则表达式
+#async def read_items(q: str = Query("fixedquery", min_length=3)): # fixedquery为默认值
+#async def read_items(q: str = Query(..., min_length=3)):#...为必须值
+#async def read_items(q: Optional[List[str]] = Query(None)):#列表，传入多个值，路径为：/items/?q=foo&q=bar，响应体：{"q":"foo","bar"]} 。使用List时，必须使用Query否则会被解析为响应体
+
+    result = {'items': [{'item_id': 'Foo'}, {'item_id': 'Bar'}]}
+    if q:
+        result.update({'q': q})
+    return result
+```
+
