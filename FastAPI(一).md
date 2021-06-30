@@ -270,4 +270,145 @@ async def read_item(q: Optional[str] = Query(None, title="查询字符串", desc
 ```
 
 ### 路径参数和数值校验
->1.
+>1.基本示例
+```
+'''
+路径参数及校验 Path
+'''
+# 路径参数总是必需的，因为它必须是路径的一部分。所以，你应该在声明时使用 ... 将其标记为必需参数。
+
+
+@app.get('/items/{item_id}')
+#async def read_items(    item_id: int = Path(..., title="标题"),    q: Optional[str] = Query(None, alias="item-query"),):
+# async def read_items(q: str, item_id: int = Path(..., title="标题")):# q没有默认值，应该放在参数前面
+# async def read_items(*,item_id:int=Path(...,title="标题"),q:str):# 参数q 没有使用Query,没有默认值放在了item_id后面,因此前面必须使用*,后面的参数都作为kwargs(键值对)来调用
+async def read_items(*,item_id:int=Path(...,title="标题",ge=1),q:str):#ge greater than 大于或等于equal,gt 大于,le less than 小于或等于 equal
+    results = {"item_id": item_id}
+    if q:
+        results.update({'q': q})
+    return results
+```
+### 请求体 多个参数
+>1.混合使用Path、Query
+```
+@app.put('/items/{item_id}')
+async def update_item(
+    *,
+    item_id: int = Path(..., title="标题", ge=0, le=1000),
+    q: Optional[str] = None,
+    item: Optional[Item] = None,
+):
+    results = {"item_id": item_id}
+    if q:
+        results.update({'q': q})
+    if item:
+        results.update({'q': q})
+    return results
+```
+>2.多个请求体
+```
+class Item(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    tax: Optional[float] = None
+
+
+class User(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+
+# 多个请求体
+@app.put('/items/{item_id}')
+async def update_item(item_id: int, item: Item, user: User):
+    results = {"item_id": item_id, "item": item, "user": user}
+    return results
+
+
+# 参数格式：item、user是独立的键值对
+{
+    "item": {
+        "name": "Foo",
+        "description": "The pretender",
+        "price": 42.0,
+        "tax": 3.2
+    },
+    "user": {
+        "username": "dave",
+        "full_name": "Dave Grohl"
+    }
+}
+```
+>3.请求体中的单一值,使用Body
+```
+from fastapi import Body
+# 请求体中的单一值
+@app.put('/items/{item_id}')
+async def update_item(item_id: int, item: Item, user: User, importance: int = Body(...)):# 单一值使用Body参数
+    results = {"item_id": item_id, "item": item,
+               "user": user, importance: importance}
+    return results
+    
+#参数格式：
+{
+    "item": {
+        "name": "Foo",
+        "description": "The pretender",
+        "price": 42.0,
+        "tax": 3.2
+    },
+    "user": {
+        "username": "dave",
+        "full_name": "Dave Grohl"
+    },
+    "importance": 5
+}
+```
+>4.多个请求体参数和查询参数
+```
+# 多个请球体参数和查询参数
+
+@app.put('/items/{item_id}')
+async def update_item(
+    *,
+    item_id: int,
+    item: Item,
+    user: User,
+    importance: int = Body(..., gt=0),
+    q: Optional[str] = None
+):
+    results = {"item_id": item_id, "item": item,
+               "user": user, "importance": importance}
+    if q:
+        results.update({'q': q})
+    return results
+
+```
+>5.嵌入单个请求体参数，使用item: Item = Body(..., embed=True)
+```
+# 嵌入单个请求体参数， Body(..., embed=True) 将
+@app.put("/items/{item_id}")
+async def update_item(
+    item_id: int, 
+    #user:User, #什么都不加，必须放在Body前面，否则报错
+    item: Item = Body(..., embed=True)):
+    results = {'item_id': item_id, "item": item}
+    return results
+    
+#参数格式：
+{
+  "item": {
+    "name": "string",
+    "description": "string",
+    "price": 0,
+    "tax": 0
+  }
+}
+#如果 embed=False,参数格式：
+{
+  "name": "string",
+  "description": "string",
+  "price": 0,
+  "tax": 0
+}
+```
