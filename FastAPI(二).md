@@ -345,3 +345,137 @@ async def read_item_public_data(item_id: str):
     return items[item_id]
 
 ```
+### 多模型
+>1.密码示例
+```
+#定义入口数据模型类
+class UserIn(BaseModel):
+    username: str
+    password: str #明文
+    email: EmailStr
+    full_name: Optional[str] = None
+
+#定义出口数据模型类，没有密码
+class UserOut(BaseModel):
+    username: str
+    email: EmailStr
+    full_name: Optional[str] = None
+
+#定义数据库数据模型类
+class UserInDB(BaseModel):
+    username: str
+    hashed_password: str#哈希之后的密码
+    email: EmailStr
+    full_name: Optional[str] = None
+
+#明文密码哈希
+def fake_password_hasher(raw_password: str):
+    return "supersecret"+raw_password
+
+#保存到数据库
+def fake_save_user(user_in: UserIn):
+    hashed_password = fake_password_hasher(user_in.password)
+    user_in_db = UserInDB(**user_in.dict(), hashed_password=hashed_password)#**user_in.dict()解包，然后再由UserInDB封装成对象
+    print("User Saved!....")
+    return user_in_db
+
+@app.post('/user/',response_model=UserOut)
+async def create_user(user_in:UserIn):
+    user_saved = fake_save_user(user_in)#保存数据
+    return user_saved
+```
+```
+#简化代码
+class UserBase(BaseModel):
+    username:str
+    email:EmailStr
+    full_name:Optional[str]=None
+
+class UserIn(UserBase):
+    password:str
+
+class UserOut(UserBase):
+    pass
+
+class UserInDB(UserBase):
+    hashed_password:str
+```
+>2.Union 
+```
+class BaseItem(BaseModel):
+    description: str
+    type: str
+
+
+class CarItem(BaseItem):
+    type = 'car'
+
+
+class PlaneItem(BaseItem):
+    type = 'plane'
+    size: int
+
+
+items = {
+    "item1": {"description": "All my friends drive a low rider", "type": "car"},
+    "item2": {
+        "description": "Music is my aeroplane, it's my aeroplane",
+        "type": "plane",
+        "size": 5,
+    },
+}
+
+
+@app.get('/items/{item_id}', response_model=Union[CarItem, PlaneItem]) #Union 返回的响应数据必须符合CarItem或PlaneItem中任意一种格式
+async def read_items(item_id: str):
+    return items[item_id]
+```
+>3.响应数据模型列表List
+```
+class Item(BaseModel):
+    name: str
+    description: str
+
+
+items = [
+    {"name": "Foo", "description": "There comes my hero"},
+    {"name": "Red", "description": "It's my aeroplane"},
+]
+
+@app.get("/items/", response_model=List[Item])  # 也可以使用模型列表
+async def read_items():
+    return items
+```
+>4.响应模型字典Dict
+```
+#响应模型 字典
+@app.get("/keyword-weights/", response_model=Dict[str, float])#返回的模型，必须key:str,value:float形式
+async def read_keyword_weights():
+    return {"foo": 2.3, "bar": 3.4}
+```
+### 响应状态码
+```
+
+from fastapi import FastAPI,status
+
+
+app = FastAPI()
+
+
+'''
+100 及以上状态码用于「消息」响应。你很少直接使用它们。具有这些状态代码的响应不能带有响应体。
+200 及以上状态码用于「成功」响应。这些是你最常使用的。
+200 是默认状态代码，它表示一切「正常」。
+另一个例子会是 201，「已创建」。它通常在数据库中创建了一条新记录后使用。
+一个特殊的例子是 204，「无内容」。此响应在没有内容返回给客户端时使用，因此该响应不能包含响应体。
+300 及以上状态码用于「重定向」。具有这些状态码的响应可能有或者可能没有响应体，但 304「未修改」是个例外，该响应不得含有响应体。
+400 及以上状态码用于「客户端错误」响应。这些可能是你第二常使用的类型。
+一个例子是 404，用于「未找到」响应。
+对于来自客户端的一般错误，你可以只使用 400。
+500 及以上状态码用于服务器端错误。你几乎永远不会直接使用它们。当你的应用程序代码或服务器中的某些部分出现问题时，它将自动返回这些状态代码之一。
+'''
+# @app.post('/items/', status_code=201)#status_code状态码，必须是第一个参数。可以直接用数字
+@app.post('/items/',status_code=status.HTTP_201_CREATED) #使用状态码便捷变量
+async def create_item(name: str):
+    return{'name': name}
+```
